@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../models/user_book.dart';
+import '../services/user_book_service.dart';
 import 'book_detail_screen.dart';
 import 'book_registration_screen.dart';
 
@@ -12,47 +14,43 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
-  final List<Map<String, dynamic>> _libraryBooks = [
-    {
-      "title": "아주 작은 습관의 힘",
-      "author": "제임스 클리어",
-      "progress": 72,
-      "currentPage": 230,
-      "pages": 320,
-      "cover":
-          "https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=400&q=80",
-      "goalDate": DateTime.now().add(const Duration(days: 14)),
-      "notes": [
-        {
-          "text": "작은 단계라도 꾸준히!",
-          "page": 120,
-          "date": DateTime.now().subtract(const Duration(days: 2)),
-        },
-      ],
-    },
-    {
-      "title": "어린 왕자",
-      "author": "앙투안 드 생텍쥐페리",
-      "progress": 100,
-      "currentPage": 180,
-      "pages": 180,
-      "cover":
-          "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=400&q=80",
-      "goalDate": DateTime.now(),
-      "notes": const [],
-    },
-    {
-      "title": "부의 인문학",
-      "author": "브라운스톤",
-      "progress": 35,
-      "currentPage": 147,
-      "pages": 420,
-      "cover":
-          "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=400&q=80",
-      "goalDate": DateTime.now().add(const Duration(days: 30)),
-      "notes": const [],
-    },
-  ];
+  final UserBookService _userBookService = const UserBookService();
+
+  List<UserBook> _userBooks = [];
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserBooks();
+  }
+
+  Future<void> _loadUserBooks() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final books = await _userBookService.fetchUserBooks();
+      if (!mounted) return;
+      setState(() {
+        _userBooks = books;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = "내 서재 정보를 불러오지 못했어요.";
+        _userBooks = [];
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   String _formatGoalDate(DateTime date) {
     final String month = date.month.toString().padLeft(2, '0');
@@ -65,36 +63,20 @@ class _LibraryScreenState extends State<LibraryScreen> {
       MaterialPageRoute(builder: (_) => const BookRegistrationScreen()),
     );
 
+    if (!mounted) return;
     if (result != null) {
-      setState(() {
-        _libraryBooks.insert(0, {
-          ...result,
-          "progress": result["progress"] ?? 0,
-          "pages": result["pages"] ?? 300,
-          "currentPage": result["currentPage"] ?? 0,
-          "goalDate": result["goalDate"],
-          "notes": result["notes"] ?? [],
-        });
-      });
+      await _loadUserBooks();
     }
   }
 
   Future<void> _openBookDetail(int index) async {
-    final book = _libraryBooks[index];
-    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+    final book = _userBooks[index];
+    final shouldRefresh = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => BookDetailScreen(book: book)),
     );
 
-    if (result != null) {
-      setState(() {
-        _libraryBooks[index] = {
-          ...book,
-          "currentPage": result["currentPage"],
-          "progress": result["progress"],
-          "goalDate": result["goalDate"] ?? book["goalDate"],
-          "notes": result["notes"] ?? book["notes"],
-        };
-      });
+    if (shouldRefresh == true && mounted) {
+      await _loadUserBooks();
     }
   }
 
@@ -128,157 +110,195 @@ class _LibraryScreenState extends State<LibraryScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          ..._libraryBooks.asMap().entries.map((entry) {
-            final book = entry.value;
-            final index = entry.key;
-            final int progress = book["progress"] as int;
-            final DateTime? goalDate = book["goalDate"] as DateTime?;
-            return GestureDetector(
-              onTap: () => _openBookDetail(index),
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 14),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      offset: const Offset(0, 3),
-                      blurRadius: 12,
+          if (_isLoading)
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 40),
+              alignment: Alignment.center,
+              child: const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
+              ),
+            )
+          else if (_errorMessage != null)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              alignment: Alignment.center,
+              child: Column(
+                children: [
+                  Text(
+                    _errorMessage!,
+                    style: const TextStyle(
+                      color: Color(0xFF8E8E93),
+                      fontWeight: FontWeight.w600,
                     ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        book["cover"] as String,
-                        width: 64,
-                        height: 88,
-                        fit: BoxFit.cover,
-                        loadingBuilder: (context, child, progress) {
-                          if (progress == null) return child;
-                          return Container(
-                            width: 64,
-                            height: 88,
-                            alignment: Alignment.center,
-                            color: Colors.grey.shade200,
-                            child: const CupertinoActivityIndicator(),
-                          );
-                        },
-                        errorBuilder:
-                            (_, __, ___) => Container(
-                              width: 64,
-                              height: 88,
-                              color: Colors.grey.shade200,
-                              alignment: Alignment.center,
-                              child: const Icon(
-                                Icons.menu_book_rounded,
-                                color: Colors.grey,
-                              ),
-                            ),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: () => _loadUserBooks(),
+                    child: const Text("다시 시도"),
+                  ),
+                ],
+              ),
+            )
+          else if (_userBooks.isEmpty)
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 40),
+              alignment: Alignment.center,
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.menu_book_rounded,
+                    size: 48,
+                    color: Color(0xFF8E8E93),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    "아직 등록된 책이 없어요.",
+                    style: TextStyle(
+                      color: Color(0xFF8E8E93),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            ..._userBooks.asMap().entries.map((entry) {
+              final book = entry.value;
+              final index = entry.key;
+              final int progressPercent = book.progressPercent;
+              final double progressRatio = book.progressRatio;
+              final DateTime? goalDate = book.goalDate;
+              final String coverUrl = book.coverUrl;
+
+              return GestureDetector(
+                onTap: () => _openBookDetail(index),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        offset: const Offset(0, 3),
+                        blurRadius: 12,
                       ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            book["title"] as String,
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF1C1C1E),
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            book["author"] as String,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF8E8E93),
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Stack(
-                            children: [
-                              Container(
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF2F2F7),
-                                  borderRadius: BorderRadius.circular(4),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: coverUrl.isEmpty
+                            ? Container(
+                                width: 64,
+                                height: 88,
+                                color: Colors.grey.shade200,
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  Icons.menu_book_rounded,
+                                  color: Colors.grey,
                                 ),
-                              ),
-                              FractionallySizedBox(
-                                widthFactor: progress / 100,
-                                child: Container(
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [
-                                        Color(0xFF667EEA),
-                                        Color(0xFF764BA2),
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(4),
+                              )
+                            : Image.network(
+                                coverUrl,
+                                width: 64,
+                                height: 88,
+                                fit: BoxFit.cover,
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Container(
+                                    width: 64,
+                                    height: 88,
+                                    alignment: Alignment.center,
+                                    color: Colors.grey.shade200,
+                                    child: const CupertinoActivityIndicator(),
+                                  );
+                                },
+                                errorBuilder: (_, __, ___) => Container(
+                                  width: 64,
+                                  height: 88,
+                                  color: Colors.grey.shade200,
+                                  alignment: Alignment.center,
+                                  child: const Icon(
+                                    Icons.menu_book_rounded,
+                                    color: Colors.grey,
                                   ),
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            "$progress% 완료",
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF667EEA),
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                          if (goalDate != null) ...[
-                            const SizedBox(height: 8),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              "${_formatGoalDate(goalDate)} 완독 목표",
+                              book.title,
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF1C1C1E),
+                                letterSpacing: -0.5,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 12),
+                            Stack(
+                              children: [
+                                Container(
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF2F2F7),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                                FractionallySizedBox(
+                                  widthFactor: progressRatio,
+                                  child: Container(
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFF667EEA),
+                                          Color(0xFF764BA2),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              "$progressPercent% 읽는 중",
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF1C1C1E),
+                                color: Color(0xFF667EEA),
                               ),
                             ),
+                            if (goalDate != null) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                "${_formatGoalDate(goalDate)} 완독 예정",
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1C1C1E),
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF667EEA).withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Text(
-                        "기록",
-                        style: TextStyle(
-                          color: Color(0xFF667EEA),
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.2,
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            );
-          }),
+              );
+            }),
           const SizedBox(height: 16),
           GestureDetector(
             onTap: _openBookRegistration,

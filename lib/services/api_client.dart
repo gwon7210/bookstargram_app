@@ -54,4 +54,29 @@ class ApiClient {
 
     return http.post(uri, headers: requestHeaders, body: body);
   }
+
+  Future<http.Response> patch(
+    String path, {
+    Map<String, String>? headers,
+    Object? body,
+    bool authenticated = true,
+  }) async {
+    final uri = EnvironmentConfig.apiUri(path);
+    final requestHeaders = <String, String>{
+      'Content-Type': 'application/json',
+      if (headers != null) ...headers,
+    };
+
+    if (authenticated) {
+      final token = AuthTokenStore.instance.token;
+      if (token != null && token.isNotEmpty) {
+        requestHeaders['Authorization'] = 'Bearer $token';
+      }
+    }
+
+    // ignore: avoid_print
+    print('[ApiClient] PATCH $uri headers=$requestHeaders body=$body');
+
+    return http.patch(uri, headers: requestHeaders, body: body);
+  }
 }

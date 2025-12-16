@@ -16,12 +16,22 @@ class BookSearchResult {
   factory BookSearchResult.fromJson(Map<String, dynamic> json) {
     final rawTitle = json['title'] as String? ?? '';
     final rawAuthor = json['author'] as String? ?? '';
+    final sanitizedTitle = rawTitle.replaceAll(RegExp(r'<[^>]*>'), '');
+    final sanitizedAuthor = rawAuthor.replaceAll(RegExp(r'<[^>]*>'), '');
+    final imageFromCover = json['cover'] as String?;
+    final imageFromImage = json['image'] as String?;
+    final isbnValue =
+        (json['isbn13'] as String?)?.trim().isNotEmpty == true
+            ? json['isbn13'] as String
+            : json['isbn'] as String? ?? '';
 
     return BookSearchResult(
-      title: rawTitle.replaceAll(RegExp(r'<[^>]*>'), ''),
-      author: rawAuthor.replaceAll(RegExp(r'<[^>]*>'), ''),
-      imageUrl: json['image'] as String? ?? '',
-      isbn: json['isbn'] as String? ?? '',
+      title: sanitizedTitle,
+      author: sanitizedAuthor,
+      imageUrl: imageFromCover?.isNotEmpty == true
+          ? imageFromCover!
+          : (imageFromImage ?? ''),
+      isbn: isbnValue,
       link: json['link'] as String?,
     );
   }
