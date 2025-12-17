@@ -14,7 +14,6 @@ class BookRegistrationScreen extends StatefulWidget {
 }
 
 class _BookRegistrationScreenState extends State<BookRegistrationScreen> {
-  static const String _defaultQuery = "클린코드";
   static const int _searchStep = 0;
   static const int _goalStep = 1;
 
@@ -36,9 +35,6 @@ class _BookRegistrationScreenState extends State<BookRegistrationScreen> {
   @override
   void initState() {
     super.initState();
-    _query = _defaultQuery;
-    _searchController.text = _defaultQuery;
-    _fetchBooks(_query);
   }
 
   void _onSelectBook(BookSearchResult book) {

@@ -97,19 +97,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
           ),
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _openBookRegistration,
+        backgroundColor: const Color(0xFF667EEA),
+        child: const Icon(Icons.add_rounded, size: 32),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          const Text(
-            "최근 추가한 책",
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF1C1C1E),
-              letterSpacing: -0.8,
-            ),
-          ),
-          const SizedBox(height: 16),
           if (_isLoading)
             Container(
               margin: const EdgeInsets.symmetric(vertical: 40),
@@ -299,68 +294,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 ),
               );
             }),
-          const SizedBox(height: 16),
-          GestureDetector(
-            onTap: _openBookRegistration,
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    offset: const Offset(0, 3),
-                    blurRadius: 12,
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF667EEA).withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.add_rounded,
-                      color: Color(0xFF667EEA),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "새 책 등록하기",
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          "읽고 싶은 책을 서재에 추가해 보세요.",
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF8E8E93),
-                            letterSpacing: -0.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: Color(0xFF8E8E93),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );
