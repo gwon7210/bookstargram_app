@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../models/feeling_entry.dart';
 import 'api_client.dart';
 
 class ReadingLogService {
@@ -25,5 +26,18 @@ class ReadingLogService {
         response.statusCode != 204) {
       throw Exception('독서 기록을 저장하지 못했어요. (${response.statusCode})');
     }
+  }
+
+  Future<List<FeelingEntry>> fetchFeelings(String userBookId) async {
+    final response = await _apiClient.get('/feelings/$userBookId');
+
+    if (response.statusCode != 200) {
+      throw Exception('독서 기록을 불러오지 못했어요. (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body) as List<dynamic>;
+    return decoded
+        .map((item) => FeelingEntry.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 }

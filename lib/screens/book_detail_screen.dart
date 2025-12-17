@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../models/feeling_entry.dart';
 import '../models/user_book.dart';
+import '../services/reading_log_service.dart';
 import '../services/user_book_service.dart';
 import 'reading_log_screen.dart';
 
@@ -16,7 +18,11 @@ class BookDetailScreen extends StatefulWidget {
 class _BookDetailScreenState extends State<BookDetailScreen> {
   late final TextEditingController _pageController;
   final UserBookService _userBookService = const UserBookService();
+  final ReadingLogService _readingLogService = const ReadingLogService();
   bool _isSaving = false;
+  bool _isLoadingFeelings = false;
+  String? _feelingError;
+  final List<FeelingEntry> _feelings = [];
 
   int get _totalPages => widget.book.pageCount;
   int get _clampUpperBound => _totalPages > 0 ? _totalPages : 0;
@@ -27,6 +33,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     super.initState();
     final int initialPage = widget.book.currentPage;
     _pageController = TextEditingController(text: initialPage.toString());
+    _fetchFeelings();
   }
 
   @override
@@ -73,6 +80,40 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("독서 기록을 저장했어요.")),
     );
+    await _fetchFeelings();
+  }
+
+  Future<void> _fetchFeelings() async {
+    setState(() {
+      _isLoadingFeelings = true;
+      _feelingError = null;
+    });
+
+    try {
+      final logs = await _readingLogService.fetchFeelings(widget.book.id);
+      if (!mounted) return;
+      setState(() {
+        _feelings
+          ..clear()
+          ..addAll(logs);
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _feelingError = error.toString().replaceFirst('Exception: ', '');
+        _feelings.clear();
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() => _isLoadingFeelings = false);
+    }
+  }
+
+  String _formatLogDate(DateTime date) {
+    final year = date.year.toString();
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return "$year.$month.$day";
   }
 
   @override
@@ -252,6 +293,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                         ],
                       ),
                       const SizedBox(height: 24),
+                      _buildFeelingsSection(),
                     ],
                   ),
                 ),
@@ -260,51 +302,54 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ElevatedButton(
+                  FilledButton(
                     onPressed: _isSaving ? null : _saveProgress,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: const Color(0xFF667EEA),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      backgroundColor: const Color(0xFF1C1C1E),
+                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(18),
                       ),
                     ),
-                    child:
-                        _isSaving
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
-                                  ),
-                                ),
-                              )
-                            : const Text(
-                                "확인",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
+                    child: _isSaving
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text(
+                            "확인",
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
                   ),
                   const SizedBox(height: 12),
-                  OutlinedButton(
+                  FilledButton(
                     onPressed: _openReadingLog,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      foregroundColor: const Color(0xFF667EEA),
-                      side: const BorderSide(color: Color(0xFF667EEA)),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      elevation: 0,
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF1C1C1E),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(18),
+                        side: const BorderSide(color: Color(0xFFE5E5EA)),
                       ),
                     ),
                     child: const Text(
                       "독서 기록 남기기",
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 17,
                         fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
                       ),
                     ),
                   ),
@@ -313,6 +358,110 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildFeelingsSection() {
+    Widget buildContent() {
+      if (_isLoadingFeelings) {
+        return const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
+            ),
+          ),
+        );
+      }
+
+      if (_feelingError != null) {
+        return Text(
+          _feelingError!,
+          style: const TextStyle(
+            fontSize: 13,
+            color: Color(0xFF8E8E93),
+            fontWeight: FontWeight.w600,
+          ),
+        );
+      }
+
+      if (_feelings.isEmpty) {
+        return const Text(
+          "아직 기록이 없어요.",
+          style: TextStyle(
+            fontSize: 13,
+            color: Color(0xFF8E8E93),
+            fontWeight: FontWeight.w600,
+          ),
+        );
+      }
+
+      return _buildFeelingListView();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "독서 기록",
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.4,
+          ),
+        ),
+        const SizedBox(height: 12),
+        buildContent(),
+      ],
+    );
+  }
+
+  Widget _buildFeelingListView() {
+    final children = _feelings.map((entry) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _formatLogDate(entry.recordedAt),
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF8E8E93),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              entry.text,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF1C1C1E),
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+      );
+    }).toList();
+
+    if (_feelings.length <= 4) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      );
+    }
+
+    return SizedBox(
+      height: 220,
+      child: ListView(
+        padding: EdgeInsets.zero,
+        physics: const BouncingScrollPhysics(),
+        children: children,
       ),
     );
   }
